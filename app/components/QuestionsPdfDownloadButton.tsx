@@ -31,7 +31,7 @@ export default function QuestionsPdfDownloadButton({ title, questions }: Props) 
     // Title
     doc.setFont("helvetica", "bold");
     doc.setFontSize(16);
-    const titleLines = doc.splitTextToSize(`${title} - Comprehension Questions`, maxWidth);
+    const titleLines = doc.splitTextToSize(`${title} - Discussion Questions`, maxWidth);
     checkPageBreak(titleLines.length * 7);
     doc.text(titleLines, margin, y);
     y += titleLines.length * 7 + 10;
@@ -72,7 +72,7 @@ export default function QuestionsPdfDownloadButton({ title, questions }: Props) 
         <line x1="16" y1="13" x2="8" y2="13" />
         <line x1="16" y1="17" x2="8" y2="17" />
       </svg>
-      Questions PDF
+      Discussion PDF
     </button>
   );
 }

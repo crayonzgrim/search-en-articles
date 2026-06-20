@@ -66,7 +66,7 @@ export default function PdfDownloadButton({ article, questions }: Props) {
 
       doc.setFont("helvetica", "bold");
       doc.setFontSize(13);
-      doc.text("Comprehension Questions", margin, y);
+      doc.text("Discussion Questions", margin, y);
       y += 10;
 
       doc.setFont("helvetica", "normal");

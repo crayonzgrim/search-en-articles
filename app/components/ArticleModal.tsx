@@ -68,13 +68,6 @@ export default function ArticleModal({ article, isSaved, onToggleSave }: Props) 
         </div>
 
         <article className="flex-1 overflow-y-auto px-6 pb-14 pt-20 sm:px-10 lg:px-14 xl:px-16">
-          <p className="mb-4 font-mono text-[10px] uppercase tracking-[0.18em] text-zinc-400">
-            {new Date(article.publishedAt).toLocaleDateString("en-US", {
-              month: "long",
-              day: "numeric",
-              year: "numeric",
-            })}
-          </p>
           <h1 className="mb-8 max-w-4xl font-serif text-3xl font-bold leading-[1.12] tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-4xl">
             {article.title}
           </h1>
@@ -96,9 +89,9 @@ export default function ArticleModal({ article, isSaved, onToggleSave }: Props) 
 
         <div className="hidden w-px bg-zinc-200 dark:bg-zinc-800 xl:mt-12 xl:block" />
 
-        <aside className="w-full overflow-y-auto border-t border-zinc-200 px-6 pb-10 pt-20 dark:border-zinc-800 xl:w-[22rem] xl:shrink-0 xl:border-t-0">
+        <aside className="w-full overflow-y-auto border-t border-zinc-200 px-6 pb-10 pt-20 dark:border-zinc-800 xl:w-[38rem] xl:shrink-0 xl:border-t-0 xl:px-9">
           <h2 className="mb-5 font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
-            Comprehension Questions
+            Discussion Questions
           </h2>
           <QuestionPanel
             articleText={article.content}

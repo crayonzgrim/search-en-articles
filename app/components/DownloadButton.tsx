@@ -17,7 +17,7 @@ export default function DownloadButton({ article, questions }: Props) {
     ];
 
     if (questions.length > 0) {
-      lines.push("", "---", "", "Comprehension Questions", "-".repeat(22), "");
+      lines.push("", "---", "", "Discussion Questions", "-".repeat(20), "");
       questions.forEach((q, i) => {
         lines.push(`${i + 1}. ${q}`);
       });

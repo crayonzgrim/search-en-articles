@@ -5,7 +5,8 @@ import type { Article } from "@/app/api/news/route";
 import ArticleList from "./ArticleList";
 import ArticleModal from "./ArticleModal";
 
-const ARTICLES_STORAGE_KEY = "daily-english:articles:v1";
+// v3 preserves paragraphs and removes embedded media metadata.
+const ARTICLES_STORAGE_KEY = "daily-english:articles:v3";
 const SAVED_ARTICLES_STORAGE_KEY = "daily-english:saved-articles:v1";
 const REFRESH_STATE_STORAGE_KEY = "daily-english:refresh-state:v1";
 const DUPLICATE_REFRESH_LIMIT = 3;

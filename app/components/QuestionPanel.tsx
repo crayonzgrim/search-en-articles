@@ -44,7 +44,7 @@ export default function QuestionPanel({ articleText, onQuestionsLoaded }: Props)
     return (
       <div className="border border-dashed border-zinc-300 bg-zinc-50 p-5 text-center dark:border-zinc-700 dark:bg-zinc-900/50">
         <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
-          필요할 때만 AI로 독해 질문 30개를 만드세요.
+          필요할 때만 AI로 토론 질문 30개를 만드세요.
         </p>
         <button
           type="button"
@@ -65,7 +65,7 @@ export default function QuestionPanel({ articleText, onQuestionsLoaded }: Props)
             <path d="m12 3-1.7 4.3L6 9l4.3 1.7L12 15l1.7-4.3L18 9l-4.3-1.7L12 3Z" />
             <path d="m5 16-.9 2.1L2 19l2.1.9L5 22l.9-2.1L8 19l-2.1-.9L5 16Z" />
           </svg>
-          AI 질문 만들기
+          토론 질문 만들기
         </button>
         {error ? (
           <p className="mt-3 text-xs text-red-600 dark:text-red-400">{error}</p>
@@ -107,20 +107,48 @@ export default function QuestionPanel({ articleText, onQuestionsLoaded }: Props)
     onQuestionsLoaded?.(questions, newCheckedStates);
   };
 
+  const allChecked = checkedQuestions.length > 0 && checkedQuestions.every(Boolean);
+  const selectedCount = checkedQuestions.filter(Boolean).length;
+
+  const handleToggleAll = () => {
+    const newCheckedStates = new Array(questions.length).fill(!allChecked);
+    setCheckedQuestions(newCheckedStates);
+    onQuestionsLoaded?.(questions, newCheckedStates);
+  };
+
   return (
-    <ol className="flex flex-col gap-3">
-      {questions.map((q, i) => (
-        <li key={i} className="flex gap-2">
+    <div>
+      <label className="mb-5 flex cursor-pointer items-center justify-between border-y border-zinc-200 py-3 text-xs font-semibold text-zinc-600 dark:border-zinc-800 dark:text-zinc-300">
+        <span className="flex items-center gap-2">
           <input
             type="checkbox"
-            checked={checkedQuestions[i] ?? false}
-            onChange={() => handleCheckboxChange(i)}
-            className="mt-0.5 shrink-0 cursor-pointer rounded border-zinc-300 text-blue-600"
+            checked={allChecked}
+            onChange={handleToggleAll}
+            className="shrink-0 cursor-pointer rounded border-zinc-300 text-amber-700 focus:ring-amber-600"
           />
-          <span className="shrink-0 text-xs font-bold text-blue-500">{i + 1}.</span>
-          <p className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">{q}</p>
-        </li>
-      ))}
-    </ol>
+          전체 선택
+        </span>
+        <span className="font-mono text-[10px] font-normal text-zinc-400">
+          {selectedCount} / {questions.length}
+        </span>
+      </label>
+
+      <ol className="flex flex-col gap-4">
+        {questions.map((q, i) => (
+          <li key={i} className="flex gap-2.5">
+            <input
+              type="checkbox"
+              checked={checkedQuestions[i] ?? false}
+              onChange={() => handleCheckboxChange(i)}
+              className="mt-0.5 shrink-0 cursor-pointer rounded border-zinc-300 text-amber-700 focus:ring-amber-600"
+            />
+            <span className="shrink-0 font-mono text-xs font-bold text-amber-700 dark:text-amber-500">
+              {i + 1}.
+            </span>
+            <p className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">{q}</p>
+          </li>
+        ))}
+      </ol>
+    </div>
   );
 }

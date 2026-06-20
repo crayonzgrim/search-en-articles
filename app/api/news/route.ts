@@ -18,12 +18,64 @@ type NewsApiArticle = {
   source: { name: string };
 };
 
+function decodeHtmlEntities(text: string): string {
+  const namedEntities: Record<string, string> = {
+    amp: "&",
+    apos: "'",
+    gt: ">",
+    hellip: "…",
+    ldquo: "“",
+    lsquo: "‘",
+    nbsp: " ",
+    quot: '"',
+    rdquo: "”",
+    rsquo: "’",
+    lt: "<",
+  };
+
+  return text.replace(/&(#(?:x[0-9a-f]+|\d+)|[a-z]+);/gi, (entity, code: string) => {
+    if (code.startsWith("#x")) return String.fromCodePoint(Number.parseInt(code.slice(2), 16));
+    if (code.startsWith("#")) return String.fromCodePoint(Number.parseInt(code.slice(1), 10));
+    return namedEntities[code.toLowerCase()] ?? entity;
+  });
+}
+
+function htmlToParagraphText(html: string): string {
+  const paragraphs = decodeHtmlEntities(
+    html
+      .replace(/<\s*(?:script|style|video)\b[^>]*>[\s\S]*?<\s*\/\s*(?:script|style|video)\s*>/gi, "")
+      .replace(/<\s*br\s*\/?\s*>/gi, "\n")
+      .replace(/<\s*\/?\s*(?:p|div|article|section|blockquote|h[1-6])\b[^>]*>/gi, "\n\n")
+      .replace(/<\s*li\b[^>]*>/gi, "\n• ")
+      .replace(/<\s*\/\s*li\s*>/gi, "\n")
+      .replace(/<[^>]+>/g, " ")
+  )
+    .split(/\n+/)
+    .map((paragraph) => paragraph.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+
+  // Article extractors can include video controls, captions, bylines and dates
+  // before the actual story. Start at the first sentence-like body paragraph.
+  const bodyStart = paragraphs.findIndex(
+    (paragraph) => paragraph.length >= 90 && /[.!?]["'”’)]?$/.test(paragraph)
+  );
+  const bodyParagraphs = bodyStart >= 0 ? paragraphs.slice(bodyStart) : paragraphs;
+
+  return bodyParagraphs
+    .filter(
+      (paragraph) =>
+        !/^play$/i.test(paragraph) &&
+        !/^\W+$/u.test(paragraph) &&
+        !/^\d+\s+min\s+read(?:\s+\d+\s+min\s+read)*$/i.test(paragraph)
+    )
+    .join("\n\n");
+}
+
 async function extractContent(url: string, fallback: string): Promise<string> {
   try {
     const result = await extract(url);
     if (result?.content) {
-      // Strip HTML tags from extracted content
-      return result.content.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+      return htmlToParagraphText(result.content);
     }
   } catch {
     // Silent fallback

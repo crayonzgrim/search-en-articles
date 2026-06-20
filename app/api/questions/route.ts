@@ -49,7 +49,11 @@ export async function POST(request: Request) {
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-  const prompt = `You are an English teacher. Based on the following article, generate exactly 30 comprehension questions to help students understand and think critically about the content. Return ONLY a valid JSON array of 30 strings, with no markdown, no explanation, no code block — just the raw JSON array.
+  const prompt = `You are an English discussion teacher. Based on the following article, generate exactly 30 open-ended discussion questions for an English conversation class.
+
+Each question must invite opinions, reasoning, debate, interpretation, prediction, personal experience, or connections to wider social issues. Use details from the article as context, but do not create factual recall or reading-comprehension questions whose answers can simply be copied from the article. Avoid yes-or-no questions. Make the questions varied, natural, and suitable for a thoughtful group discussion.
+
+Return ONLY a valid JSON array of 30 strings, with no markdown, no explanation, no code block — just the raw JSON array.
 
 Article:
 ${articleText.slice(0, 8000)}`;
