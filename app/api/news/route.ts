@@ -86,6 +86,8 @@ export async function GET(request: Request) {
     const generalArticles =
       needed > 0
         ? await fetchNewsApiArticles(apiKey, "top-headlines", {
+            country: "us",
+            category: "general",
             pageSize: String(needed + 5),
           })
         : [];
