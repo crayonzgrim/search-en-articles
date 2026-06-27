@@ -123,8 +123,14 @@ export default function NewsApp() {
 
   async function fetchArticles(popularMode: boolean) {
     const res = await fetch(popularMode ? "/api/news?mode=popular" : "/api/news");
-    const data = await res.json();
-    if (!res.ok || data.error) throw new Error(data.error ?? "Failed to fetch news");
+    // Vercel returns a plain-text page (not JSON) on gateway timeout, so guard
+    // the parse instead of letting res.json() throw "Unexpected token".
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data || data.error) {
+      throw new Error(
+        data?.error ?? (res.status === 504 ? "서버 응답 시간 초과" : `요청 실패 (${res.status})`)
+      );
+    }
     return data.articles as Article[];
   }
 

@@ -1,6 +1,10 @@
 import { extract } from "@extractus/article-extractor";
 import { createHash } from "crypto";
 
+// Vercel kills the function at the plan default (10s on Hobby) otherwise, which
+// shows up as an endlessly pending request when article extraction is slow.
+export const maxDuration = 60;
+
 export type Article = {
   id: string;
   title: string;
@@ -73,7 +77,12 @@ function htmlToParagraphText(html: string): string {
 
 async function extractContent(url: string, fallback: string): Promise<string> {
   try {
-    const result = await extract(url);
+    // extract() has no built-in timeout; a single slow source would otherwise
+    // stall the whole Promise.all and blow the function budget.
+    const result = await Promise.race([
+      extract(url),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 6000)),
+    ]);
     if (result?.content) {
       return htmlToParagraphText(result.content);
     }
