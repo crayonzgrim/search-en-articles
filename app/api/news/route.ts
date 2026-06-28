@@ -22,6 +22,23 @@ type NewsApiArticle = {
   source: { name: string };
 };
 
+type WorldNewsArticle = {
+  title: string;
+  text: string | null;
+  summary: string | null;
+  url: string;
+  publish_date: string;
+  source_country: string | null;
+};
+
+function hostnameOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
 function decodeHtmlEntities(text: string): string {
   const namedEntities: Record<string, string> = {
     amp: "&",
@@ -106,7 +123,39 @@ async function fetchNewsApiArticles(
   return data.articles as NewsApiArticle[];
 }
 
-function dedupeByUrl(articles: NewsApiArticle[]): NewsApiArticle[] {
+// World News API returns the full article body in `text`, so these need no
+// crawling step — unlike NewsAPI, which only gives a description.
+async function fetchWorldNewsKorea(apiKey: string, popularMode: boolean): Promise<Article[]> {
+  // Korean publishers rarely tag English, so source-countries=kr returns 0 for
+  // language=en. text=Korea finds English articles about Korea instead.
+  // ponytail: loose relevance (any "Korea" mention); tighten with sort=relevance
+  // or text="South Korea" OR Seoul if too many tangential hits.
+  const query = new URLSearchParams({
+    text: "Korea",
+    language: "en",
+    number: "10",
+    sort: "publish-time",
+    "sort-direction": "DESC",
+    ...(popularMode ? { offset: "10" } : {}),
+  });
+  const res = await fetch(`https://api.worldnewsapi.com/search-news?${query}`, {
+    headers: { "x-api-key": apiKey },
+    cache: "no-store",
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message ?? "World News API error");
+
+  return ((data.news ?? []) as WorldNewsArticle[]).map((n) => ({
+    id: createHash("md5").update(n.url).digest("hex"),
+    title: n.title,
+    content: n.text?.trim() || n.summary?.trim() || "",
+    url: n.url,
+    publishedAt: n.publish_date,
+    source: hostnameOf(n.url) || n.source_country || "World News API",
+  }));
+}
+
+function dedupeByUrl<T extends { url: string }>(articles: T[]): T[] {
   const seen = new Set<string>();
   return articles.filter((a) => {
     if (seen.has(a.url)) return false;
@@ -115,67 +164,60 @@ function dedupeByUrl(articles: NewsApiArticle[]): NewsApiArticle[] {
   });
 }
 
-export async function GET(request: Request) {
-  const apiKey = process.env.NEWS_API_KEY;
-  if (!apiKey || apiKey === "your_newsapi_key_here") {
-    return Response.json(
-      { error: "NEWS_API_KEY is not configured in .env.local" },
-      { status: 500 }
-    );
-  }
+// Batch 2: general top headlines from NewsAPI (max 10). These have no body, so
+// each is crawled with extractContent (bounded by the per-call timeout above).
+async function fetchNewsApiBatch(apiKey: string, popularMode: boolean): Promise<Article[]> {
+  const headlines = await fetchNewsApiArticles(apiKey, "top-headlines", {
+    country: "us",
+    category: "general",
+    pageSize: "10",
+    ...(popularMode ? { page: "2" } : {}),
+  });
 
-  let newsApiArticles: NewsApiArticle[];
-  try {
-    const popularMode = new URL(request.url).searchParams.get("mode") === "popular";
-
-    // Korea-related articles always remain the primary topic. Popular mode uses
-    // NewsAPI's publisher popularity ranking after repeated duplicate refreshes.
-    const koreaArticles = popularMode
-      ? await fetchNewsApiArticles(apiKey, "everything", {
-          q: "Korea OR Korean OR Seoul",
-          language: "en",
-          sortBy: "popularity",
-          pageSize: "10",
-        })
-      : await fetchNewsApiArticles(apiKey, "top-headlines", {
-          q: "Korea",
-          pageSize: "10",
-        });
-
-    // Fill any remaining slots with general top headlines.
-    const needed = 10 - koreaArticles.length;
-    const generalArticles =
-      needed > 0
-        ? await fetchNewsApiArticles(apiKey, "top-headlines", {
-            country: "us",
-            category: "general",
-            pageSize: String(needed + 5),
-          })
-        : [];
-
-    newsApiArticles = dedupeByUrl([...koreaArticles, ...generalArticles]).slice(0, 10);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to fetch news";
-    return Response.json({ error: message }, { status: 502 });
-  }
-
-  const articles: Article[] = await Promise.all(
-    newsApiArticles.map(async (a) => {
-      const id = createHash("md5").update(a.url).digest("hex");
-      const content = await extractContent(a.url, a.description ?? "");
-      return {
-        id,
+  return Promise.all(
+    dedupeByUrl(headlines)
+      .slice(0, 10)
+      .map(async (a) => ({
+        id: createHash("md5").update(a.url).digest("hex"),
         title: a.title,
-        content,
+        content: await extractContent(a.url, a.description ?? ""),
         url: a.url,
         publishedAt: a.publishedAt,
         source: a.source.name,
-      };
-    })
+      }))
   );
+}
 
-  return Response.json({
-    articles,
-    mode: new URL(request.url).searchParams.get("mode") === "popular" ? "popular" : "korea",
-  });
+export async function GET(request: Request) {
+  const worldKey = process.env.WORLD_NEWS_API_KEY;
+  const newsApiKey = process.env.NEWS_API_KEY;
+  const popularMode = new URL(request.url).searchParams.get("mode") === "popular";
+
+  // Run both sources independently so one failing key/quota still returns the
+  // other source's articles instead of an empty page.
+  const [koreaResult, generalResult] = await Promise.allSettled([
+    worldKey && worldKey !== "your_worldnewsapi_key_here"
+      ? fetchWorldNewsKorea(worldKey, popularMode)
+      : Promise.reject(new Error("WORLD_NEWS_API_KEY is not configured")),
+    newsApiKey && newsApiKey !== "your_newsapi_key_here"
+      ? fetchNewsApiBatch(newsApiKey, popularMode)
+      : Promise.reject(new Error("NEWS_API_KEY is not configured")),
+  ]);
+
+  const koreaArticles = koreaResult.status === "fulfilled" ? koreaResult.value : [];
+  const generalArticles = generalResult.status === "fulfilled" ? generalResult.value : [];
+
+  if (koreaArticles.length === 0 && generalArticles.length === 0) {
+    const reason =
+      koreaResult.status === "rejected" ? koreaResult.reason?.message : undefined;
+    return Response.json(
+      { error: reason ?? "Failed to fetch news from both sources" },
+      { status: 502 }
+    );
+  }
+
+  // Korea articles (World News API) first, then general (NewsAPI), max 20.
+  const articles = dedupeByUrl([...koreaArticles, ...generalArticles]).slice(0, 20);
+
+  return Response.json({ articles, mode: popularMode ? "popular" : "korea" });
 }
